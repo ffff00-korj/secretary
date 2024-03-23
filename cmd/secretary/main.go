@@ -4,13 +4,16 @@ import (
 	"log"
 	"os"
 
-	"github.com/Syfaro/telegram-bot-api"
+	tgbotapi "github.com/Syfaro/telegram-bot-api"
 	"github.com/joho/godotenv"
 )
 
-func main() {
-	log.Print("Initializing the application...")
+const (
+	timeout      int = 60
+	updateOffset int = 0
+)
 
+func app() *tgbotapi.BotAPI {
 	if err := godotenv.Load(); err != nil {
 		log.Print("No .env file found")
 		panic(err)
@@ -20,13 +23,22 @@ func main() {
 		log.Print(err)
 		panic(err)
 	}
+	return bot
+}
 
-	log.Print("Application is initialized!")
-
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
+func getUpdate(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {
+	u := tgbotapi.NewUpdate(updateOffset)
+	u.Timeout = timeout
 
 	updates, err := bot.GetUpdatesChan(u)
+	if err != nil {
+		log.Print(err)
+		panic(err)
+	}
+	return updates
+}
+
+func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
 	for update := range updates {
 		if update.Message == nil {
 			continue
@@ -39,10 +51,20 @@ func main() {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Here is how I can help you.")
 			bot.Send(msg)
 		default:
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "I received your message, but didn't understand. Try /help")
+			msg := tgbotapi.NewMessage(
+				update.Message.Chat.ID,
+				"I received your message, but didn't understand. Try /help",
+			)
 			bot.Send(msg)
 		}
 	}
+}
 
+func main() {
+	log.Print("Initializing the application...")
+	bot := app()
+	log.Print("Application is initialized!")
+	updates := getUpdate(bot)
+	processAnUpdate(bot, updates)
 	log.Print("Application is closed!")
 }
