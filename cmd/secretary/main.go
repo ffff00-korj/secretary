@@ -45,15 +45,18 @@ func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
 		}
 		switch update.Message.Text {
 		case "/start":
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Hello, i`m youre secretary.")
+			msg := tgbotapi.NewMessage(
+				update.Message.Chat.ID,
+				"Hi, i`m been employed as your personal assistant. If you want to know what i can do type /help",
+			)
 			bot.Send(msg)
 		case "/help":
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Here is how I can help you.")
+			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Here's what I can do")
 			bot.Send(msg)
 		default:
 			msg := tgbotapi.NewMessage(
 				update.Message.Chat.ID,
-				"I received your message, but didn't understand. Try /help",
+				"I received your message, but did not recognize it. Try /help",
 			)
 			bot.Send(msg)
 		}
