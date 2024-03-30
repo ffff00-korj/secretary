@@ -1,17 +1,20 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 
 	tgbotapi "github.com/Syfaro/telegram-bot-api"
 	dotenv "github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 const (
-	cmdStart string = "/start"
-	cmdHelp  string = "/help"
+	cmdStart      string = "/start"
+	cmdHelp       string = "/help"
+	cmdAddProduct string = "/add"
 )
 
 const (
@@ -22,17 +25,23 @@ const (
 const (
 	envFileName      string = ".env"
 	envTelegramToken string = "TELEGRAM_TOKEN"
+
+	envDBHost    string = "DB_HOST"
+	envDBPort    string = "DB_PORT"
+	envDBSSLMode string = "DB_SSLMODE"
+
+	envDBName     string = "POSTGRES_DB"
+	envDBUser     string = "POSTGRES_USER"
+	envDBPassword string = "POSTGRES_PASSWORD"
 )
 
 func app() *tgbotapi.BotAPI {
 	if err := dotenv.Load(); err != nil {
-		log.Print(fmt.Sprintf("No %s file found", envFileName))
-		panic(err)
+		log.Fatal(fmt.Sprintf("No %s file found", envFileName))
 	}
 	bot, err := tgbotapi.NewBotAPI(os.Getenv(envTelegramToken))
 	if err != nil {
-		log.Print(err)
-		panic(err)
+		log.Fatal(err)
 	}
 	return bot
 }
@@ -43,10 +52,36 @@ func getUpdate(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {
 
 	updates, err := bot.GetUpdatesChan(u)
 	if err != nil {
-		log.Print(err)
-		panic(err)
+		log.Fatal(err)
 	}
 	return updates
+}
+
+func addTestProduct() {
+	psqlInfo := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		os.Getenv(envDBHost),
+		os.Getenv(envDBPort),
+		os.Getenv(envDBUser),
+		os.Getenv(envDBPassword),
+		os.Getenv(envDBName),
+		os.Getenv(envDBSSLMode),
+	)
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("Database connected")
+	insertProductStr := `INSERT INTO products(Name, Id) VALUES($1, $2)`
+	_, err = db.Exec(insertProductStr, "CreditCard", 0)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 }
 
 func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
@@ -67,6 +102,8 @@ func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
 		case cmdHelp:
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Here's what I can do")
 			bot.Send(msg)
+		case cmdAddProduct:
+			addTestProduct()
 		default:
 			msg := tgbotapi.NewMessage(
 				update.Message.Chat.ID,
