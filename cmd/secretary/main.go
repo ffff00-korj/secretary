@@ -6,7 +6,7 @@ import (
 	"os"
 
 	tgbotapi "github.com/Syfaro/telegram-bot-api"
-	"github.com/joho/godotenv"
+	dotenv "github.com/joho/godotenv"
 )
 
 const (
@@ -15,17 +15,21 @@ const (
 )
 
 const (
-	timeout        int    = 60
-	updateOffset   int    = 0
-	tgTokenEnvName string = "TELEGRAM_TOKEN"
+	timeout      int = 60
+	updateOffset int = 0
+)
+
+const (
+	envFileName      string = ".env"
+	envTelegramToken string = "TELEGRAM_TOKEN"
 )
 
 func app() *tgbotapi.BotAPI {
-	if err := godotenv.Load(); err != nil {
-		log.Print("No .env file found")
+	if err := dotenv.Load(); err != nil {
+		log.Print(fmt.Sprintf("No %s file found", envFileName))
 		panic(err)
 	}
-	bot, err := tgbotapi.NewBotAPI(os.Getenv(tgTokenEnvName))
+	bot, err := tgbotapi.NewBotAPI(os.Getenv(envTelegramToken))
 	if err != nil {
 		log.Print(err)
 		panic(err)
