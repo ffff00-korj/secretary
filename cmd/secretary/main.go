@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	cmdStart      string = "/start"
-	cmdHelp       string = "/help"
-	cmdAddProduct string = "/add"
+	cmdStart      string = "start"
+	cmdHelp       string = "help"
+	cmdAddProduct string = "add"
 )
 
 const (
@@ -57,7 +57,7 @@ func getUpdate(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {
 	return updates
 }
 
-func addTestProduct() {
+func addTestProduct(name string) {
 	psqlInfo := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		os.Getenv(envDBHost),
@@ -76,8 +76,8 @@ func addTestProduct() {
 		log.Fatal(err)
 	}
 	log.Print("Database connected")
-	insertProductStr := `INSERT INTO products(Name, Id) VALUES($1, $2)`
-	_, err = db.Exec(insertProductStr, "CreditCard", 0)
+	insertProductStr := `INSERT INTO products(Name) VALUES($1)`
+	_, err = db.Exec(insertProductStr, name)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
 		if update.Message == nil {
 			continue
 		}
-		switch update.Message.Text {
+		switch update.Message.Command() {
 		case cmdStart:
 			msg := tgbotapi.NewMessage(
 				update.Message.Chat.ID,
@@ -103,7 +103,12 @@ func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Here's what I can do")
 			bot.Send(msg)
 		case cmdAddProduct:
-			addTestProduct()
+			addTestProduct(string(update.Message.CommandArguments()))
+			msg := tgbotapi.NewMessage(
+				update.Message.Chat.ID,
+				"Successfuly added new Product!",
+			)
+			bot.Send(msg)
 		default:
 			msg := tgbotapi.NewMessage(
 				update.Message.Chat.ID,
