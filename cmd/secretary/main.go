@@ -35,7 +35,7 @@ const (
 	envDBPassword string = "POSTGRES_PASSWORD"
 )
 
-func app() *tgbotapi.BotAPI {
+func app() (*tgbotapi.BotAPI, *sql.DB) {
 	if err := dotenv.Load(); err != nil {
 		log.Fatal(fmt.Sprintf("No %s file found", envFileName))
 	}
@@ -43,21 +43,6 @@ func app() *tgbotapi.BotAPI {
 	if err != nil {
 		log.Fatal(err)
 	}
-	return bot
-}
-
-func getUpdate(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {
-	u := tgbotapi.NewUpdate(updateOffset)
-	u.Timeout = timeout
-
-	updates, err := bot.GetUpdatesChan(u)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return updates
-}
-
-func addTestProduct(name string) {
 	psqlInfo := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		os.Getenv(envDBHost),
@@ -76,15 +61,30 @@ func addTestProduct(name string) {
 		log.Fatal(err)
 	}
 	log.Print("Database connected")
-	insertProductStr := `INSERT INTO products(Name) VALUES($1)`
-	_, err = db.Exec(insertProductStr, name)
+
+	return bot, db
+}
+
+func getUpdate(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {
+	u := tgbotapi.NewUpdate(updateOffset)
+	u.Timeout = timeout
+
+	updates, err := bot.GetUpdatesChan(u)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	return updates
 }
 
-func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
+func addProduct(db *sql.DB, name string) {
+	insertProductStr := `INSERT INTO products(Name) VALUES($1)`
+	_, err := db.Exec(insertProductStr, name)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func processAnUpdate(bot *tgbotapi.BotAPI, db *sql.DB, updates tgbotapi.UpdatesChannel) {
 	for update := range updates {
 		if update.Message == nil {
 			continue
@@ -103,7 +103,7 @@ func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Here's what I can do")
 			bot.Send(msg)
 		case cmdAddProduct:
-			addTestProduct(string(update.Message.CommandArguments()))
+			addProduct(db, string(update.Message.CommandArguments()))
 			msg := tgbotapi.NewMessage(
 				update.Message.Chat.ID,
 				"Successfuly added new Product!",
@@ -121,9 +121,10 @@ func processAnUpdate(bot *tgbotapi.BotAPI, updates tgbotapi.UpdatesChannel) {
 
 func main() {
 	log.Print("Initializing the application...")
-	bot := app()
+	bot, db := app()
+	defer db.Close()
 	log.Print("Application is initialized!")
 	updates := getUpdate(bot)
-	processAnUpdate(bot, updates)
+	processAnUpdate(bot, db, updates)
 	log.Print("Application is closed!")
 }
