@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 
 	tgbotapi "github.com/Syfaro/telegram-bot-api"
 	dotenv "github.com/joho/godotenv"
@@ -15,6 +17,7 @@ const (
 	cmdStart      string = "start"
 	cmdHelp       string = "help"
 	cmdAddProduct string = "add"
+	cmdGetTotal   string = "total"
 )
 
 const (
@@ -34,6 +37,13 @@ const (
 	envDBUser     string = "POSTGRES_USER"
 	envDBPassword string = "POSTGRES_PASSWORD"
 )
+
+type product struct {
+	name string
+	sum  int
+}
+
+type products []product
 
 func app() (*tgbotapi.BotAPI, *sql.DB) {
 	if err := dotenv.Load(); err != nil {
@@ -76,12 +86,30 @@ func getUpdate(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {
 	return updates
 }
 
-func addProduct(db *sql.DB, name string) {
-	insertProductStr := `INSERT INTO products(Name) VALUES($1)`
-	_, err := db.Exec(insertProductStr, name)
+func addProduct(db *sql.DB, p product) {
+	insertProductStr := `INSERT INTO products(Name, Sum) VALUES($1, $2)`
+	_, err := db.Exec(insertProductStr, p.name, p.sum)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func parseCommandArguments(args string) []string {
+	return strings.Split(args, " ")
+}
+
+func getTotal(db *sql.DB) (int, error) {
+	getTotalStr := `SELECT SUM(sum) AS total FROM products`
+	rows, err := db.Query(getTotalStr)
+	if err != nil {
+		log.Print(err)
+		return 0, err
+	}
+	var total int
+	rows.Next()
+	rows.Scan(&total)
+
+	return total, nil
 }
 
 func processAnUpdate(bot *tgbotapi.BotAPI, db *sql.DB, updates tgbotapi.UpdatesChannel) {
@@ -103,11 +131,44 @@ func processAnUpdate(bot *tgbotapi.BotAPI, db *sql.DB, updates tgbotapi.UpdatesC
 			msg := tgbotapi.NewMessage(update.Message.Chat.ID, "Here's what I can do")
 			bot.Send(msg)
 		case cmdAddProduct:
-			addProduct(db, string(update.Message.CommandArguments()))
+			arguments := parseCommandArguments(update.Message.CommandArguments())
+			if len(arguments) != 2 {
+				msg := tgbotapi.NewMessage(
+					update.Message.Chat.ID,
+					"Not enough arguments!",
+				)
+				bot.Send(msg)
+				continue
+			}
+			sum, err := strconv.Atoi(arguments[1])
+			if err != nil {
+				msg := tgbotapi.NewMessage(
+					update.Message.Chat.ID,
+					"Second argument should be a number!",
+				)
+				bot.Send(msg)
+				continue
+			}
+			addProduct(db, product{name: arguments[0], sum: sum})
 			msg := tgbotapi.NewMessage(
 				update.Message.Chat.ID,
 				"Successfuly added new Product!",
 			)
+			bot.Send(msg)
+		case cmdGetTotal:
+			total, err := getTotal(db)
+			var msg tgbotapi.MessageConfig
+			if err != nil {
+				msg = tgbotapi.NewMessage(
+					update.Message.Chat.ID,
+					"Can't get total :(",
+				)
+			} else {
+				msg = tgbotapi.NewMessage(
+					update.Message.Chat.ID,
+					fmt.Sprintf("Total: %d", total),
+				)
+			}
 			bot.Send(msg)
 		default:
 			msg := tgbotapi.NewMessage(
