@@ -16,3 +16,9 @@ run:
 
 migrate_up:
 	goose -dir $(MIGRATIONS_DIR) postgres "user=$(POSTGRES_USER) password=$(POSTGRES_PASSWORD) dbname=$(POSTGRES_DB) sslmode=$(DB_SSLMODE)" up
+
+db_run:
+	docker compose up -d
+
+db_down:
+	docker compose down
