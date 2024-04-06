@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS public.products (
 	id serial4 NOT NULL,
 	sum int4 DEFAULT 0 NOT NULL,
 	paymentday int4 DEFAULT 1 NOT NULL,
+	CONSTRAINT name_unique UNIQUE (name),
 	CONSTRAINT products_pkey PRIMARY KEY (id)
 );
 -- +goose StatementEnd

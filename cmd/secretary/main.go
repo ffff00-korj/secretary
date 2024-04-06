@@ -138,16 +138,37 @@ func (app *bot_app) getUpdates() (tgbotapi.UpdatesChannel, error) {
 	return updates, nil
 }
 
+func (app *bot_app) checkProductExists(p *product) (bool, error) {
+	rows, err := app.db.Query(
+		"SELECT COUNT(*) AS count FROM products AS p WHERE p.Name = $1",
+		p.name,
+	)
+	if err != nil {
+		return false, err
+	}
+	var count int
+	rows.Next()
+	rows.Scan(&count)
+	if count != 0 {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (app *bot_app) addProduct(p *product) error {
-	insertProductStr := `INSERT INTO products(Name, Sum, PaymentDay) VALUES($1, $2, $3)`
-	_, err := app.db.Exec(insertProductStr, p.name, p.sum, p.paymentDay)
+	_, err := app.db.Exec(
+		"INSERT INTO products(Name, Sum, PaymentDay) VALUES($1, $2, $3)",
+		p.name,
+		p.sum,
+		p.paymentDay,
+	)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func parseCommandArguments(args string) []string {
+func parseMessageArguments(args string) []string {
 	return strings.Split(args, " ")
 }
 
@@ -155,9 +176,9 @@ func (app *bot_app) getTotal() (int, error) {
 	dayNow := time.Now().Day()
 	var getTotalStr string
 	if dayNow < 5 || dayNow >= 20 {
-		getTotalStr = `SELECT SUM(sum) AS total FROM products WHERE paymentDay >= 5 AND paymentDay < 20`
+		getTotalStr = "SELECT SUM(p.sum) AS total FROM products AS p WHERE p.paymentDay >= 5 AND p.paymentDay < 20"
 	} else {
-		getTotalStr = `SELECT SUM(sum) AS total FROM products WHERE paymentDay < 5 OR paymentDay >= 20`
+		getTotalStr = "SELECT SUM(p.sum) AS total FROM products AS p WHERE p.paymentDay < 5 OR p.paymentDay >= 20"
 	}
 	rows, err := app.db.Query(getTotalStr)
 	if err != nil {
@@ -172,7 +193,7 @@ func (app *bot_app) getTotal() (int, error) {
 
 func (app *bot_app) processAnUpdate(upd tgbotapi.Update) error {
 	if upd.Message == nil {
-		return errors.New("Not messages are consumed!")
+		return errors.New("No messages are consumed!")
 	}
 	switch upd.Message.Command() {
 	case cmdStart:
@@ -180,9 +201,17 @@ func (app *bot_app) processAnUpdate(upd tgbotapi.Update) error {
 	case cmdHelp:
 		app.sendMessage(helpMessage(), upd.Message.Chat.ID)
 	case cmdAddProduct:
-		p, val_err := newProduct(parseCommandArguments(upd.Message.CommandArguments()))
+		p, val_err := newProduct(parseMessageArguments(upd.Message.CommandArguments()))
 		if val_err != nil {
 			app.sendMessage(val_err.Error(), upd.Message.Chat.ID)
+			return nil
+		}
+		exists, err := app.checkProductExists(p)
+		if err != nil {
+			return err
+		}
+		if exists {
+			app.sendMessage("Product with this name already exists.", upd.Message.Chat.ID)
 			return nil
 		}
 		if err := app.addProduct(p); err != nil {
