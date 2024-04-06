@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -30,6 +31,7 @@ const (
 	envFileName      string = ".env"
 	envTelegramToken string = "TELEGRAM_TOKEN"
 
+	dbDriverName string = "postgres"
 	envDBHost    string = "DB_HOST"
 	envDBPort    string = "DB_PORT"
 	envDBSSLMode string = "DB_SSLMODE"
@@ -39,68 +41,117 @@ const (
 	envDBPassword string = "POSTGRES_PASSWORD"
 )
 
+type bot_app struct {
+	bot *tgbotapi.BotAPI
+	db  *sql.DB
+}
+
 type product struct {
 	name       string
 	sum        int
 	paymentDay int
 }
 
-type products []product
+func helpMessage() string {
+	return fmt.Sprintf(`Here's what I can do:
+/%s to start application,
+/%s to see help message,
+/%s <name> <sum> <payment day> to add,
+/%s to see how many dollars you spent on your next sallary.`, cmdStart, cmdHelp, cmdAddProduct, cmdGetTotal)
+}
 
-func app() (*tgbotapi.BotAPI, *sql.DB) {
+func newApp() *bot_app {
+	return &bot_app{bot: nil, db: nil}
+}
+
+func newProduct(args []string) (*product, error) {
+	if len(args) != 3 {
+		return nil, errors.New("Not enough arguments!")
+	}
+	sum, err := strconv.Atoi(args[1])
+	if err != nil {
+		return nil, errors.New("Second argument should be a number!")
+	}
+	day, err := strconv.Atoi(args[2])
+	if err != nil {
+		return nil, errors.New("Third argument should be a number!")
+	}
+	return &product{name: args[0], sum: sum, paymentDay: day}, nil
+}
+
+func (p *product) string() string {
+	return fmt.Sprintf("Name: %s,\nSum: %d,\nPayment day: %d", p.name, p.sum, p.paymentDay)
+}
+
+func (app *bot_app) init() (err error) {
+	log.Print("Initializing the application...")
 	if err := dotenv.Load(); err != nil {
-		log.Fatal(fmt.Sprintf("No %s file found", envFileName))
+		return errors.New(
+			fmt.Sprintf("Maybe %s file not found. Err message: %s", envFileName, err.Error()),
+		)
 	}
-	bot, err := tgbotapi.NewBotAPI(os.Getenv(envTelegramToken))
+	app.bot, err = tgbotapi.NewBotAPI(os.Getenv(envTelegramToken))
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
-	psqlInfo := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		os.Getenv(envDBHost),
-		os.Getenv(envDBPort),
-		os.Getenv(envDBUser),
-		os.Getenv(envDBPassword),
-		os.Getenv(envDBName),
-		os.Getenv(envDBSSLMode),
+	app.db, err = sql.Open(
+		dbDriverName,
+		fmt.Sprintf(
+			"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+			os.Getenv(envDBHost),
+			os.Getenv(envDBPort),
+			os.Getenv(envDBUser),
+			os.Getenv(envDBPassword),
+			os.Getenv(envDBName),
+			os.Getenv(envDBSSLMode)),
 	)
-	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
+	if err = app.db.Ping(); err != nil {
+		return err
 	}
 	log.Print("Database connected")
+	log.Print("Application is initialized!")
 
-	return bot, db
+	return nil
 }
 
-func getUpdate(bot *tgbotapi.BotAPI) tgbotapi.UpdatesChannel {
-	u := tgbotapi.NewUpdate(updateOffset)
-	u.Timeout = timeout
+func (app *bot_app) close() {
+	app.db.Close()
+	log.Print("Application is closed!")
+}
 
-	updates, err := bot.GetUpdatesChan(u)
+func (app *bot_app) sendMessage(msg string, chatId int64) {
+	tg_msg := tgbotapi.NewMessage(chatId, msg)
+	app.bot.Send(tg_msg)
+}
+
+func (app *bot_app) getUpdates() (tgbotapi.UpdatesChannel, error) {
+	upd := tgbotapi.NewUpdate(updateOffset)
+	upd.Timeout = timeout
+
+	updates, err := app.bot.GetUpdatesChan(upd)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	return updates
+	return updates, nil
 }
 
-func addProduct(db *sql.DB, p product) {
+func (app *bot_app) addProduct(p *product) error {
 	insertProductStr := `INSERT INTO products(Name, Sum, PaymentDay) VALUES($1, $2, $3)`
-	_, err := db.Exec(insertProductStr, p.name, p.sum, p.paymentDay)
+	_, err := app.db.Exec(insertProductStr, p.name, p.sum, p.paymentDay)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
+	return nil
 }
 
 func parseCommandArguments(args string) []string {
 	return strings.Split(args, " ")
 }
 
-func getTotal(db *sql.DB) int {
+func (app *bot_app) getTotal() (int, error) {
 	dayNow := time.Now().Day()
 	var getTotalStr string
 	if dayNow < 5 || dayNow >= 20 {
@@ -108,98 +159,71 @@ func getTotal(db *sql.DB) int {
 	} else {
 		getTotalStr = `SELECT SUM(sum) AS total FROM products WHERE paymentDay < 5 OR paymentDay >= 20`
 	}
-	rows, err := db.Query(getTotalStr)
+	rows, err := app.db.Query(getTotalStr)
 	if err != nil {
-		log.Fatal(err)
+		return 0, err
 	}
 	var total int
 	rows.Next()
 	rows.Scan(&total)
 
-	return total
+	return total, nil
 }
 
-func processAnUpdate(bot *tgbotapi.BotAPI, db *sql.DB, updates tgbotapi.UpdatesChannel) {
-	for update := range updates {
-		if update.Message == nil {
-			continue
-		}
-		switch update.Message.Command() {
-		case cmdStart:
-			msg := tgbotapi.NewMessage(
-				update.Message.Chat.ID,
-				fmt.Sprintf(
-					"Application started! Try /%s",
-					cmdHelp,
-				),
-			)
-			bot.Send(msg)
-		case cmdHelp:
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID,
-				fmt.Sprintf(`Here's what I can do:
-/%s to start application,
-/%s to see help message,
-/%s <name> <sum> <payment day> to add,
-/%s to see how many dollars you spent on your next sallary.`,
-					cmdStart, cmdHelp, cmdAddProduct, cmdGetTotal))
-			bot.Send(msg)
-		case cmdAddProduct:
-			arguments := parseCommandArguments(update.Message.CommandArguments())
-			if len(arguments) != 3 {
-				msg := tgbotapi.NewMessage(
-					update.Message.Chat.ID,
-					"Not enough arguments!",
-				)
-				bot.Send(msg)
-				continue
-			}
-			sum, err := strconv.Atoi(arguments[1])
-			if err != nil {
-				msg := tgbotapi.NewMessage(
-					update.Message.Chat.ID,
-					"Second argument should be a number!",
-				)
-				bot.Send(msg)
-				continue
-			}
-			day, err := strconv.Atoi(arguments[2])
-			if err != nil {
-				msg := tgbotapi.NewMessage(
-					update.Message.Chat.ID,
-					"Third argument should be a number!",
-				)
-				bot.Send(msg)
-				continue
-			}
-			addProduct(db, product{name: arguments[0], sum: sum, paymentDay: day})
-			msg := tgbotapi.NewMessage(
-				update.Message.Chat.ID,
-				"Successfuly added new Product!",
-			)
-			bot.Send(msg)
-		case cmdGetTotal:
-			total := getTotal(db)
-			msg := tgbotapi.NewMessage(
-				update.Message.Chat.ID,
-				fmt.Sprintf("Total: %d", total),
-			)
-			bot.Send(msg)
-		default:
-			msg := tgbotapi.NewMessage(
-				update.Message.Chat.ID,
-				fmt.Sprintf("Command not recognized. Try /%s", cmdHelp),
-			)
-			bot.Send(msg)
-		}
+func (app *bot_app) processAnUpdate(upd tgbotapi.Update) error {
+	if upd.Message == nil {
+		return errors.New("Not messages are consumed!")
 	}
+	switch upd.Message.Command() {
+	case cmdStart:
+		app.sendMessage(fmt.Sprintf("Application started! Try /%s", cmdHelp), upd.Message.Chat.ID)
+	case cmdHelp:
+		app.sendMessage(helpMessage(), upd.Message.Chat.ID)
+	case cmdAddProduct:
+		p, val_err := newProduct(parseCommandArguments(upd.Message.CommandArguments()))
+		if val_err != nil {
+			app.sendMessage(val_err.Error(), upd.Message.Chat.ID)
+			return nil
+		}
+		if err := app.addProduct(p); err != nil {
+			app.sendMessage(
+				"Can't add product: Something went wrong on the server :(",
+				upd.Message.Chat.ID,
+			)
+			return err
+		}
+		app.sendMessage(
+			fmt.Sprintf("Successfuly added new product:\n\n%s", p.string()),
+			upd.Message.Chat.ID,
+		)
+	case cmdGetTotal:
+		total, err := app.getTotal()
+		if err != nil {
+			return err
+		}
+		app.sendMessage(fmt.Sprintf("Total: %d", total), upd.Message.Chat.ID)
+	default:
+		app.sendMessage(
+			fmt.Sprintf("Command not recognized. Try /%s", cmdHelp),
+			upd.Message.Chat.ID,
+		)
+	}
+	return nil
 }
 
 func main() {
-	log.Print("Initializing the application...")
-	bot, db := app()
-	defer db.Close()
-	log.Print("Application is initialized!")
-	updates := getUpdate(bot)
-	processAnUpdate(bot, db, updates)
-	log.Print("Application is closed!")
+	app := newApp()
+	if err := app.init(); err != nil {
+		log.Fatal(err)
+	}
+	defer app.close()
+	upds, err := app.getUpdates()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for upd := range upds {
+		if err := app.processAnUpdate(upd); err != nil {
+			log.Print(err)
+		}
+	}
 }

@@ -22,3 +22,6 @@ db_run:
 
 db_down:
 	docker compose down
+
+db_dump:
+	pg_dump -U $(POSTGRES_USER) -h $(DB_HOST) -d $(POSTGRES_DB) > $(DB_BACKUP_PATH)/dump.sql
