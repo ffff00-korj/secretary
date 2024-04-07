@@ -4,8 +4,20 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/jedib0t/go-pretty/v6/table"
+
 	"github.com/ffff00-korj/secretary/internal/product"
 )
+
+type expenseReportRow struct {
+	Name string
+	Sum  int
+}
+
+type expenseReport struct {
+	rows  []expenseReportRow
+	total expenseReportRow
+}
 
 func (app *bot_app) checkProductExists(p *product.Product) (bool, error) {
 	query := `SELECT
@@ -40,12 +52,14 @@ func (app *bot_app) addProduct(p *product.Product) (int, error) {
 	return id, nil
 }
 
-func (app *bot_app) getTotal() (int, error) {
+func (app *bot_app) getExpenseReport() (string, error) {
 	dayNow := time.Now().Day()
 	var query string
 	if dayNow < 5 || dayNow >= 20 {
 		query = `SELECT
-            SUM(p.sum) AS total
+            p.name AS name,
+            p.sum AS sum,
+            p.paymentDay AS paymentDay
         FROM
             products AS p
         WHERE
@@ -53,18 +67,43 @@ func (app *bot_app) getTotal() (int, error) {
             p.paymentDay < 20`
 	} else {
 		query = `SELECT
-            SUM(p.sum) AS total
+            p.name AS name,
+            p.sum AS sum,
+            p.paymentDay AS paymentDay
         FROM
             products AS p
         WHERE
             p.paymentDay < 5 OR
             p.paymentDay >= 20`
 	}
-	var total int
-	err := app.db.QueryRow(query).Scan(&total)
+	var (
+		er         expenseReport
+		total      int
+		name       string
+		sum        int
+		paymentDay int
+	)
+	rows, err := app.db.Query(query)
 	if err != nil {
-		return 0, err
+		return "", err
 	}
+	for rows.Next() {
+		rows.Scan(&name, &sum, &paymentDay)
+		er.rows = append(er.rows, expenseReportRow{Name: name, Sum: sum})
+		total += sum
+	}
+	er.total = expenseReportRow{Name: "total", Sum: total}
 
-	return total, nil
+	return er.String(), nil
+}
+
+func (er *expenseReport) String() string {
+	t := table.NewWriter()
+	t.AppendHeader(table.Row{"name", "sum"})
+	for _, rr := range er.rows {
+		t.AppendRow(table.Row{rr.Name, rr.Sum})
+	}
+	t.AppendFooter(table.Row{er.total.Name, er.total.Sum})
+
+	return t.Render()
 }

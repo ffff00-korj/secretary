@@ -83,15 +83,16 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 		app.sendMessage(
 			fmt.Sprintf("Application started! Try /%s", config.CmdHelp),
 			upd.Message.Chat.ID,
+			"",
 		)
 	case config.CmdHelp:
-		app.sendMessage(utils.HelpMessage(), upd.Message.Chat.ID)
+		app.sendMessage(utils.HelpMessage(), upd.Message.Chat.ID, "")
 	case config.CmdAdd:
 		p, val_err := product.NewProduct(
 			utils.ParseMessageArguments(upd.Message.CommandArguments()),
 		)
 		if val_err != nil {
-			app.sendMessage(val_err.Error(), upd.Message.Chat.ID)
+			app.sendMessage(val_err.Error(), upd.Message.Chat.ID, "")
 			return nil
 		}
 		exists, err := app.checkProductExists(p)
@@ -99,36 +100,42 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 			return err
 		}
 		if exists {
-			app.sendMessage("Product with this name already exists.", upd.Message.Chat.ID)
+			app.sendMessage("Product with this name already exists.", upd.Message.Chat.ID, "")
 			return nil
 		}
 		if _, err := app.addProduct(p); err != nil {
 			app.sendMessage(
 				"Can't add product: Something went wrong on the server :(",
 				upd.Message.Chat.ID,
+				"",
 			)
 			return err
 		}
 		app.sendMessage(
 			fmt.Sprintf("Successfuly added new product:\n\n%s", p.String()),
 			upd.Message.Chat.ID,
+			"",
 		)
-	case config.CmdTotal:
-		total, err := app.getTotal()
+	case config.CmdExpenseReport:
+		report, err := app.getExpenseReport()
 		if err != nil {
 			return err
 		}
-		app.sendMessage(fmt.Sprintf("Total: %d", total), upd.Message.Chat.ID)
+		app.sendMessage("```"+report+"```", upd.Message.Chat.ID, "markdown")
 	default:
 		app.sendMessage(
 			fmt.Sprintf("Command not recognized. Try /%s", config.CmdHelp),
 			upd.Message.Chat.ID,
+			"",
 		)
 	}
 	return nil
 }
 
-func (app *bot_app) sendMessage(msg string, chatId int64) {
+func (app *bot_app) sendMessage(msg string, chatId int64, parser string) {
 	tg_msg := tgbotapi.NewMessage(chatId, msg)
+	if parser != "" {
+		tg_msg.ParseMode = parser
+	}
 	app.bot.Send(tg_msg)
 }

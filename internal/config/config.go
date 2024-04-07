@@ -1,10 +1,10 @@
 package config
 
 const (
-	CmdStart string = "start"
-	CmdHelp  string = "help"
-	CmdAdd   string = "add"
-	CmdTotal string = "total"
+	CmdStart         string = "start"
+	CmdHelp          string = "help"
+	CmdAdd           string = "add"
+	CmdExpenseReport string = "report"
 )
 
 const (
