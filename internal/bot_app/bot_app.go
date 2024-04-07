@@ -86,7 +86,7 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 		)
 	case config.CmdHelp:
 		app.sendMessage(utils.HelpMessage(), upd.Message.Chat.ID)
-	case config.CmdAddProduct:
+	case config.CmdAdd:
 		p, val_err := product.NewProduct(
 			utils.ParseMessageArguments(upd.Message.CommandArguments()),
 		)
@@ -113,7 +113,7 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 			fmt.Sprintf("Successfuly added new product:\n\n%s", p.String()),
 			upd.Message.Chat.ID,
 		)
-	case config.CmdGetTotal:
+	case config.CmdTotal:
 		total, err := app.getTotal()
 		if err != nil {
 			return err
