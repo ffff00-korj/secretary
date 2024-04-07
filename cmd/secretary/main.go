@@ -139,33 +139,36 @@ func (app *bot_app) getUpdates() (tgbotapi.UpdatesChannel, error) {
 }
 
 func (app *bot_app) checkProductExists(p *product) (bool, error) {
-	rows, err := app.db.Query(
-		"SELECT COUNT(*) AS count FROM products AS p WHERE p.Name = $1",
-		p.name,
-	)
+	query := `SELECT
+        1 AS exists
+    FROM
+        products AS p
+    WHERE
+        p.name = $1
+    LIMIT
+        1`
+
+	var exists bool
+	err := app.db.QueryRow(query, p.name).Scan(&exists)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, nil
+		}
 		return false, err
 	}
-	var count int
-	rows.Next()
-	rows.Scan(&count)
-	if count != 0 {
-		return true, nil
-	}
-	return false, nil
+	return true, nil
 }
 
-func (app *bot_app) addProduct(p *product) error {
-	_, err := app.db.Exec(
-		"INSERT INTO products(Name, Sum, PaymentDay) VALUES($1, $2, $3)",
-		p.name,
-		p.sum,
-		p.paymentDay,
-	)
+func (app *bot_app) addProduct(p *product) (int, error) {
+	query := `INSERT INTO products(Name, Sum, PaymentDay)
+        VALUES($1, $2, $3) RETURNING id`
+
+	var id int
+	err := app.db.QueryRow(query, p.name, p.sum, p.paymentDay).Scan(&id)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	return nil
+	return id, nil
 }
 
 func parseMessageArguments(args string) []string {
@@ -174,19 +177,29 @@ func parseMessageArguments(args string) []string {
 
 func (app *bot_app) getTotal() (int, error) {
 	dayNow := time.Now().Day()
-	var getTotalStr string
+	var query string
 	if dayNow < 5 || dayNow >= 20 {
-		getTotalStr = "SELECT SUM(p.sum) AS total FROM products AS p WHERE p.paymentDay >= 5 AND p.paymentDay < 20"
+		query = `SELECT
+            SUM(p.sum) AS total
+        FROM
+            products AS p
+        WHERE
+            p.paymentDay >= 5 AND
+            p.paymentDay < 20`
 	} else {
-		getTotalStr = "SELECT SUM(p.sum) AS total FROM products AS p WHERE p.paymentDay < 5 OR p.paymentDay >= 20"
+		query = `SELECT
+            SUM(p.sum) AS total
+        FROM
+            products AS p
+        WHERE
+            p.paymentDay < 5 OR
+            p.paymentDay >= 20`
 	}
-	rows, err := app.db.Query(getTotalStr)
+	var total int
+	err := app.db.QueryRow(query).Scan(&total)
 	if err != nil {
 		return 0, err
 	}
-	var total int
-	rows.Next()
-	rows.Scan(&total)
 
 	return total, nil
 }
@@ -214,7 +227,7 @@ func (app *bot_app) processAnUpdate(upd tgbotapi.Update) error {
 			app.sendMessage("Product with this name already exists.", upd.Message.Chat.ID)
 			return nil
 		}
-		if err := app.addProduct(p); err != nil {
+		if _, err := app.addProduct(p); err != nil {
 			app.sendMessage(
 				"Can't add product: Something went wrong on the server :(",
 				upd.Message.Chat.ID,
