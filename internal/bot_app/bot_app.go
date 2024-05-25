@@ -121,7 +121,7 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 		if err != nil {
 			return err
 		}
-		app.sendMessage("```"+report+"```", upd.Message.Chat.ID, "markdown")
+		app.sendMessage(utils.TextToMarkdown(report), upd.Message.Chat.ID, "markdown")
 	default:
 		app.sendMessage(
 			fmt.Sprintf("Command not recognized. Try /%s", config.CmdHelp),

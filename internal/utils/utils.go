@@ -18,3 +18,7 @@ func HelpMessage() string {
 func ParseMessageArguments(args string) []string {
 	return strings.Split(args, " ")
 }
+
+func TextToMarkdown(text string) string {
+	return fmt.Sprintf("```%s```", text)
+}
