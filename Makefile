@@ -25,3 +25,6 @@ db_down:
 
 db_dump:
 	pg_dump -U $(POSTGRES_USER) -h $(DB_HOST) -d $(POSTGRES_DB) > $(DB_BACKUP_PATH)/dump.sql
+
+db_restore:
+	cat $(DUMP_PATH) | docker compose exec -T db psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
