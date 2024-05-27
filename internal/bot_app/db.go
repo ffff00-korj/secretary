@@ -42,29 +42,57 @@ func (app *bot_app) addProduct(p *product.Product) (int, error) {
 	return id, nil
 }
 
+func (app *bot_app) getExpensePeriod(day int) (int, int, bool, error) {
+	query := `SELECT
+        s.paymentDay AS paymentDay
+    FROM
+        salaries AS s
+    ORDER BY
+        s.paymentDay`
+
+	rows, err := app.db.Query(query)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	var (
+		paymentDay  int
+		paymentDays []int
+	)
+	for rows.Next() {
+		rows.Scan(&paymentDay)
+		paymentDays = append(paymentDays, paymentDay)
+	}
+	if paymentDays[len(paymentDays)-1] <= day {
+		return paymentDays[len(paymentDays)-1], paymentDays[0], false, nil
+	}
+	return paymentDays[0], paymentDays[len(paymentDays)-1], true, nil
+}
+
 func (app *bot_app) getExpenseReport() (string, error) {
-	dayNow := time.Now().Day()
-	var query string
-	if dayNow < 5 || dayNow >= 20 {
-		query = `SELECT
-            p.name AS name,
-            p.sum AS sum,
-            p.paymentDay AS paymentDay
-        FROM
-            products AS p
-        WHERE
-            p.paymentDay >= 5 AND
-            p.paymentDay < 20`
-	} else {
-		query = `SELECT
-            p.name AS name,
-            p.sum AS sum,
-            p.paymentDay AS paymentDay
-        FROM
-            products AS p
-        WHERE
-            p.paymentDay < 5 OR
-            p.paymentDay >= 20`
+	prev, next, inner, err := app.getExpensePeriod(time.Now().Day())
+	if err != nil {
+		return "", err
+	}
+	query := `SELECT
+        p.name AS name,
+        p.sum AS sum,
+        p.paymentDay AS paymentDay
+    FROM
+        products AS p`
+    if inner {
+        query += 
+            ` WHERE
+                p.paymentDay < $1 OR
+                p.paymentDay >= $2`
+    } else {
+        query += 
+            ` WHERE
+                p.paymentDay < $1 AND
+                p.paymentDay >= $2`
+    }
+	rows, err := app.db.Query(query, prev, next)
+	if err != nil {
+		return "", err
 	}
 	var (
 		er         expenseReport
@@ -73,10 +101,6 @@ func (app *bot_app) getExpenseReport() (string, error) {
 		sum        int
 		paymentDay int
 	)
-	rows, err := app.db.Query(query)
-	if err != nil {
-		return "", err
-	}
 	for rows.Next() {
 		rows.Scan(&name, &sum, &paymentDay)
 		er.rows = append(er.rows, expenseReportRow{Name: name, Sum: sum})

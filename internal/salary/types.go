@@ -1,6 +1,6 @@
 package salary
 
-type salary struct {
+type Salary struct {
 	name       string
 	sum        int
 	paymentDay int
