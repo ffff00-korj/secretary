@@ -1,0 +1,16 @@
+-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS public.salaries (
+	"name" text NOT NULL,
+	id serial4 NOT NULL,
+	sum int4 DEFAULT 0 NOT NULL,
+	paymentday int4 DEFAULT 1 NOT NULL,
+	CONSTRAINT name_unique UNIQUE (name),
+	CONSTRAINT salaries_pkey PRIMARY KEY (id)
+);
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TABLE public.salaries;
+-- +goose StatementEnd

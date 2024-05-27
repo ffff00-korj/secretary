@@ -9,16 +9,6 @@ import (
 	"github.com/ffff00-korj/secretary/internal/product"
 )
 
-type expenseReportRow struct {
-	Name string
-	Sum  int
-}
-
-type expenseReport struct {
-	rows  []expenseReportRow
-	total expenseReportRow
-}
-
 func (app *bot_app) checkProductExists(p *product.Product) (bool, error) {
 	query := `SELECT
         1 AS exists
