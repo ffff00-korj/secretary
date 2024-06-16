@@ -16,6 +16,20 @@ import (
 	"github.com/ffff00-korj/secretary/internal/utils"
 )
 
+type bot_app struct {
+	bot *tgbotapi.BotAPI
+	db  *sql.DB
+}
+
+type expenseReportRow struct {
+	Name string
+	Sum  int
+}
+
+type expenseReport struct {
+	rows  []expenseReportRow
+	total expenseReportRow
+}
 func NewApp() *bot_app {
 	return &bot_app{bot: nil, db: nil}
 }
@@ -88,9 +102,7 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 	case config.CmdHelp:
 		app.sendMessage(utils.HelpMessage(), upd.Message.Chat.ID, "")
 	case config.CmdAdd:
-		p, val_err := product.NewProduct(
-			utils.ParseMessageArguments(upd.Message.CommandArguments()),
-		)
+		p, val_err := product.NewProductFromArgs(upd.Message.CommandArguments())
 		if val_err != nil {
 			app.sendMessage(val_err.Error(), upd.Message.Chat.ID, "")
 			return nil

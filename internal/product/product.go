@@ -4,21 +4,17 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
-func NewProduct(args []string) (*Product, error) {
-	if len(args) != 3 {
-		return nil, errors.New("Not enough arguments!")
-	}
-	sum, err := strconv.Atoi(args[1])
-	if err != nil {
-		return nil, errors.New("Second argument should be a number!")
-	}
-	day, err := strconv.Atoi(args[2])
-	if err != nil {
-		return nil, errors.New("Third argument should be a number!")
-	}
-	return &Product{name: args[0], sum: sum, paymentDay: day}, nil
+type Product struct {
+	name       string
+	sum        int
+	paymentDay int
+}
+
+func NewProduct(name string, sum, day int) *Product {
+	return &Product{name: name, sum: sum, paymentDay: day}
 }
 
 func (p *Product) String() string {
@@ -35,4 +31,20 @@ func (p *Product) GetSum() int {
 
 func (p *Product) GetPaymentDay() int {
 	return p.paymentDay
+}
+
+func NewProductFromArgs(args string) (*Product, error) {
+	argl := strings.Split(args, " ")
+	if len(argl) != 3 {
+		return nil, errors.New("Not enough arguments!")
+	}
+	sum, err := strconv.Atoi(argl[1])
+	if err != nil {
+		return nil, errors.New("Second argument should be a number!")
+	}
+	day, err := strconv.Atoi(argl[2])
+	if err != nil {
+		return nil, errors.New("Third argument should be a number!")
+	}
+	return NewProduct(argl[0], sum, day), nil
 }

@@ -2,6 +2,12 @@ package salary
 
 import "fmt"
 
+type Salary struct {
+	name       string
+	sum        int
+	paymentDay int
+}
+
 func NewSalary(name string, sum, paymentDay int) *Salary {
 	return &Salary{name: name, sum: sum, paymentDay: paymentDay}
 }

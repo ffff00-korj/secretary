@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/ffff00-korj/secretary/internal/config"
 )
@@ -13,10 +12,6 @@ func HelpMessage() string {
 /%s to see help message,
 /%s <name> <sum> <payment day> to add,
 /%s to see how many dollars you spent on your next sallary.`, config.CmdStart, config.CmdHelp, config.CmdAdd, config.CmdExpenseReport)
-}
-
-func ParseMessageArguments(args string) []string {
-	return strings.Split(args, " ")
 }
 
 func TextToMarkdown(text string) string {
