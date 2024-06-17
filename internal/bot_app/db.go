@@ -118,8 +118,7 @@ func (app *bot_app) getExpenseReport() (string, error) {
        FROM products p) AS i ON p.id = i.id
     WHERE i.paymentdate > $1
       AND i.paymentdate <= $2
-    ORDER BY
-        i.paymentdate`
+    ORDER BY i.paymentdate`
 	rows, err := app.db.Query(query, prev, next)
 	if err != nil {
 		return "", err
