@@ -22,14 +22,16 @@ type bot_app struct {
 }
 
 type expenseReportRow struct {
-	Name string
-	Sum  int
+	Name       string
+	Sum        int
+	PaymentDay int
 }
 
 type expenseReport struct {
 	rows  []expenseReportRow
 	total expenseReportRow
 }
+
 func NewApp() *bot_app {
 	return &bot_app{bot: nil, db: nil}
 }

@@ -78,13 +78,13 @@ func (app *bot_app) currentPaymentPeriod() (time.Time, time.Time, error) {
                                                      FROM CURRENT_DATE) AS int), cast(extract(DAY
                                                                                               FROM CURRENT_DATE) AS int))
     LIMIT 2`
-    rows, err := app.db.Query(query)
+	rows, err := app.db.Query(query)
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
 	var (
-		prev     time.Time
-		next     time.Time
+		prev time.Time
+		next time.Time
 	)
 	rows.Next()
 	rows.Scan(&prev)
@@ -131,7 +131,7 @@ func (app *bot_app) getExpenseReport() (string, error) {
 	)
 	for rows.Next() {
 		rows.Scan(&name, &sum, &paymentDay)
-		er.rows = append(er.rows, expenseReportRow{Name: name, Sum: sum})
+		er.rows = append(er.rows, expenseReportRow{Name: name, Sum: sum, PaymentDay: paymentDay})
 		total += sum
 	}
 	er.total = expenseReportRow{Name: "total", Sum: total}
@@ -141,9 +141,9 @@ func (app *bot_app) getExpenseReport() (string, error) {
 
 func (er *expenseReport) String() string {
 	t := table.NewWriter()
-	t.AppendHeader(table.Row{"name", "sum"})
+	t.AppendHeader(table.Row{"name", "sum", "payment day"})
 	for _, rr := range er.rows {
-		t.AppendRow(table.Row{rr.Name, rr.Sum})
+		t.AppendRow(table.Row{rr.Name, rr.Sum, rr.PaymentDay})
 	}
 	t.AppendFooter(table.Row{er.total.Name, er.total.Sum})
 
