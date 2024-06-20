@@ -65,20 +65,15 @@ func (app *bot_app) currentPaymentPeriod() (time.Time, time.Time, error) {
 	query := `SELECT
        i.paymentdate
     FROM
-      (SELECT Cast(Make_date(2, Cast(Extract(MONTH
-                                             FROM CURRENT_DATE) AS INT), paymentday) AS DATE) AS paymentdate
+      (SELECT Cast(Make_date(2, $1, paymentday) AS DATE) AS paymentdate
        FROM salaries s
-       UNION ALL SELECT cast(Make_date(2, Cast(Extract(MONTH
-                                                       FROM CURRENT_DATE) AS INT), paymentday) - interval '1 month' AS date)
+       UNION ALL SELECT cast(Make_date(2, $1, paymentday) - interval '1 month' AS date)
        FROM salaries s
-       UNION ALL SELECT cast(make_date(2, cast(extract(MONTH
-                                                       FROM CURRENT_DATE) AS int), paymentday) + interval '1 month' AS date)
+       UNION ALL SELECT cast(make_date(2, $1, paymentday) + interval '1 month' AS date)
        FROM salaries s) AS i
-    WHERE i.paymentdate >= make_date(2, cast(extract(MONTH
-                                                     FROM CURRENT_DATE) AS int), cast(extract(DAY
-                                                                                              FROM CURRENT_DATE) AS int))
+    WHERE i.paymentdate >= make_date(2, $1, $2)
     LIMIT 2`
-	rows, err := app.db.Query(query)
+	rows, err := app.db.Query(query, time.Now().Month(), time.Now().Day())
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
@@ -105,21 +100,18 @@ func (app *bot_app) getExpenseReport() (string, error) {
     FROM products p
     INNER JOIN
       (SELECT p.id,
-              cast(make_date(2, cast(extract(MONTH
-                                             FROM CURRENT_DATE) AS int), p.paymentday) AS date) AS paymentdate
+              cast(make_date(2, $1, p.paymentday) AS date) AS paymentdate
        FROM products p
        UNION ALL SELECT p.id,
-                        cast(make_date(2, cast(extract(MONTH
-                                                       FROM CURRENT_DATE) AS int), paymentday) - interval '1 month' AS date)
+                        cast(make_date(2, $1, paymentday) - interval '1 month' AS date)
        FROM products p
        UNION ALL SELECT p.id,
-                        cast(make_date(2, cast(extract(MONTH
-                                                       FROM CURRENT_DATE) AS int), paymentday) + interval '1 month' AS date)
+                        cast(make_date(2, $1, paymentday) + interval '1 month' AS date)
        FROM products p) AS i ON p.id = i.id
-    WHERE i.paymentdate > $1
-      AND i.paymentdate <= $2
+    WHERE i.paymentdate > $2
+      AND i.paymentdate <= $3
     ORDER BY i.paymentdate`
-	rows, err := app.db.Query(query, prev, next)
+	rows, err := app.db.Query(query, time.Now().Month(), prev, next)
 	if err != nil {
 		return "", err
 	}
