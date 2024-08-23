@@ -91,9 +91,6 @@ func (app *bot_app) GetUpdates() (tgbotapi.UpdatesChannel, error) {
 }
 
 func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
-	if upd.Message == nil {
-		return errors.New("No messages are consumed!")
-	}
 	switch upd.Message.Command() {
 	case config.CmdStart:
 		app.sendMessage(
@@ -104,9 +101,9 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 	case config.CmdHelp:
 		app.sendMessage(utils.HelpMessage(), upd.Message.Chat.ID, "")
 	case config.CmdAdd:
-		p, val_err := product.NewProductFromArgs(upd.Message.CommandArguments())
-		if val_err != nil {
-			app.sendMessage(val_err.Error(), upd.Message.Chat.ID, "")
+		p, err := product.NewProductFromArgs(upd.Message.CommandArguments())
+		if err != nil {
+			app.sendMessage(err.Error(), upd.Message.Chat.ID, "")
 			return nil
 		}
 		exists, err := app.checkProductExists(p)

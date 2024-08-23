@@ -17,6 +17,9 @@ func main() {
 		log.Fatal(err)
 	}
 	for upd := range upds {
+		if upd.Message == nil {
+			log.Print("No messages are consumed!")
+		}
 		if err := app.ProcessAnUpdate(upd); err != nil {
 			log.Print(err)
 		}
