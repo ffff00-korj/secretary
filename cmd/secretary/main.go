@@ -16,12 +16,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	errorsChan := make(chan error)
 	for upd := range upds {
-		if upd.Message == nil {
-			log.Print("No messages are consumed!")
-		}
-		if err := app.ProcessAnUpdate(upd); err != nil {
-			log.Print(err)
-		}
+		go app.ProcessAnUpdate(upd, errorsChan)
+	}
+	for err := range errorsChan {
+		log.Println(err)
 	}
 }

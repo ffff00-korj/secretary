@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	tgbotapi "github.com/Syfaro/telegram-bot-api"
 	dotenv "github.com/joho/godotenv"
@@ -68,10 +69,51 @@ func (app *bot_app) Init() (err error) {
 	if err = app.db.Ping(); err != nil {
 		return err
 	}
+	runPingDBTask(app.db, config.PingDuration, config.HeartBitDuration)
 	log.Print("Database connected")
 	log.Print("Application is initialized!")
 
 	return nil
+}
+
+func runPingDBTask(db *sql.DB, pingDuration, heartBitDuration time.Duration) {
+	ticker := time.NewTicker(pingDuration * time.Second)
+	quit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				err := db.Ping()
+				if err == nil {
+					log.Println("DB is fine.")
+					continue
+				} else {
+					log.Printf("%s. Starting heart bits.", err)
+				}
+				heartBitTicker := time.NewTicker(pingDuration * time.Second)
+				for tickCount := 1; tickCount <= 3; tickCount++ {
+					select {
+					case <-ticker.C:
+						err = db.Ping()
+						if err == nil {
+							log.Println("DB connection restored.")
+							break
+						}
+						log.Printf("%s. Heart bit %d", err, tickCount)
+					case <-quit:
+						heartBitTicker.Stop()
+						return
+					}
+				}
+				if err != nil {
+					log.Panic("DB is not responding.")
+				}
+			case <-quit:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
 }
 
 func (app *bot_app) Close() {
@@ -90,7 +132,7 @@ func (app *bot_app) GetUpdates() (tgbotapi.UpdatesChannel, error) {
 	return updates, nil
 }
 
-func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
+func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update, errC chan<- error) {
 	switch upd.Message.Command() {
 	case config.CmdStart:
 		app.sendMessage(
@@ -104,15 +146,17 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 		p, err := product.NewProductFromArgs(upd.Message.CommandArguments())
 		if err != nil {
 			app.sendMessage(err.Error(), upd.Message.Chat.ID, "")
-			return nil
+			errC <- err
+			return
 		}
 		exists, err := app.checkProductExists(p)
 		if err != nil {
-			return err
+			errC <- err
+			return
 		}
 		if exists {
 			app.sendMessage("Product with this name already exists.", upd.Message.Chat.ID, "")
-			return nil
+			return
 		}
 		if _, err := app.addProduct(p); err != nil {
 			app.sendMessage(
@@ -120,7 +164,8 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 				upd.Message.Chat.ID,
 				"",
 			)
-			return err
+			errC <- err
+			return
 		}
 		app.sendMessage(
 			fmt.Sprintf("Successfuly added new product:\n\n%s", p.String()),
@@ -130,7 +175,8 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 	case config.CmdExpenseReport:
 		report, err := app.getExpenseReport()
 		if err != nil {
-			return err
+			errC <- err
+			return
 		}
 		app.sendMessage(utils.TextToMarkdown(report), upd.Message.Chat.ID, "markdown")
 	default:
@@ -140,7 +186,6 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update) error {
 			"",
 		)
 	}
-	return nil
 }
 
 func (app *bot_app) sendMessage(msg string, chatId int64, parser string) {

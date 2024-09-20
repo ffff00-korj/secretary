@@ -1,5 +1,7 @@
 package config
 
+import "time"
+
 const (
 	CmdStart         string = "start"
 	CmdHelp          string = "help"
@@ -8,8 +10,10 @@ const (
 )
 
 const (
-	Timeout      int = 60
-	UpdateOffset int = 0
+	Timeout          int           = 60
+	UpdateOffset     int           = 0
+	PingDuration     time.Duration = 60
+	HeartBitDuration time.Duration = 10
 )
 
 const (

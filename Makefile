@@ -28,3 +28,6 @@ db_dump:
 
 db_restore:
 	cat $(DUMP_PATH) | docker compose exec -T db psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+
+fmt:
+	go fmt ./...
