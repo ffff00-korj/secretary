@@ -69,14 +69,14 @@ func (app *bot_app) Init() (err error) {
 	if err = app.db.Ping(); err != nil {
 		return err
 	}
-	runPingDBTask(app.db, config.PingDuration, config.HeartBitDuration)
+	runPingDBTask(app.db, config.PingDuration, config.HeartBitDuration, config.HeartBitAttempts)
 	log.Print("Database connected")
 	log.Print("Application is initialized!")
 
 	return nil
 }
 
-func runPingDBTask(db *sql.DB, pingDuration, heartBitDuration time.Duration) {
+func runPingDBTask(db *sql.DB, pingDuration, heartBitDuration time.Duration, heartBitAttempts int) {
 	ticker := time.NewTicker(pingDuration * time.Second)
 	quit := make(chan struct{})
 	go func() {
@@ -91,7 +91,7 @@ func runPingDBTask(db *sql.DB, pingDuration, heartBitDuration time.Duration) {
 					log.Printf("%s. Starting heart bits.", err)
 				}
 				heartBitTicker := time.NewTicker(pingDuration * time.Second)
-				for tickCount := 1; tickCount <= 3; tickCount++ {
+				for tickCount := 1; tickCount <= heartBitAttempts; tickCount++ {
 					select {
 					case <-ticker.C:
 						err = db.Ping()

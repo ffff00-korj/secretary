@@ -14,6 +14,7 @@ const (
 	UpdateOffset     int           = 0
 	PingDuration     time.Duration = 30
 	HeartBitDuration time.Duration = 3
+	HeartBitAttempts int           = 3
 )
 
 const (
