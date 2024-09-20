@@ -12,8 +12,8 @@ const (
 const (
 	Timeout          int           = 60
 	UpdateOffset     int           = 0
-	PingDuration     time.Duration = 60
-	HeartBitDuration time.Duration = 10
+	PingDuration     time.Duration = 30
+	HeartBitDuration time.Duration = 3
 )
 
 const (
