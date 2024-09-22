@@ -19,7 +19,7 @@ func main() {
 	errorsChan := make(chan error)
 	go func() {
 		for upd := range upds {
-			go app.ProcessAnUpdate(upd, errorsChan)
+			app.ProcessAnUpdate(upd, errorsChan)
 		}
 	}()
 	for err := range errorsChan {
