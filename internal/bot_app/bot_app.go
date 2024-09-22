@@ -145,12 +145,21 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update, errC chan<- error) {
 	case config.CmdAdd:
 		p, err := product.NewProductFromArgs(upd.Message.CommandArguments())
 		if err != nil {
-			app.sendMessage(err.Error(), upd.Message.Chat.ID, "")
-			errC <- err
+			app.sendMessage(
+				err.Error(),
+				upd.Message.Chat.ID,
+				"",
+			)
+			errC <- fmt.Errorf("Validation error: %w. args [%s]", err, upd.Message.CommandArguments())
 			return
 		}
 		exists, err := app.checkProductExists(p)
 		if err != nil {
+			app.sendMessage(
+				"Can't add product: Something went wrong on the server :(",
+				upd.Message.Chat.ID,
+				"",
+			)
 			errC <- err
 			return
 		}
@@ -175,6 +184,11 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update, errC chan<- error) {
 	case config.CmdExpenseReport:
 		report, err := app.getExpenseReport()
 		if err != nil {
+			app.sendMessage(
+				"Can't get expense report: Something went wrong on the server :(",
+				upd.Message.Chat.ID,
+				"",
+			)
 			errC <- err
 			return
 		}

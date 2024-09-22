@@ -17,9 +17,11 @@ func main() {
 		log.Fatal(err)
 	}
 	errorsChan := make(chan error)
-	for upd := range upds {
-		go app.ProcessAnUpdate(upd, errorsChan)
-	}
+	go func() {
+		for upd := range upds {
+			go app.ProcessAnUpdate(upd, errorsChan)
+		}
+	}()
 	for err := range errorsChan {
 		log.Println(err)
 	}

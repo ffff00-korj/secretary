@@ -2,6 +2,7 @@ package bot_app
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/jedib0t/go-pretty/v6/table"
@@ -20,7 +21,7 @@ func (app *bot_app) checkProductExists(p *product.Product) (bool, error) {
 		if err == sql.ErrNoRows {
 			return false, nil
 		}
-		return false, err
+		return false, fmt.Errorf("Can't check products exists, %w", err)
 	}
 	return true, nil
 }
@@ -32,7 +33,7 @@ func (app *bot_app) addProduct(p *product.Product) (int, error) {
 	var id int
 	err := app.db.QueryRow(query, p.GetName(), p.GetSum(), p.GetPaymentDay()).Scan(&id)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("Can't add product %w", err)
 	}
 	return id, nil
 }
@@ -91,7 +92,7 @@ func (app *bot_app) currentPaymentPeriod() (time.Time, time.Time, error) {
 func (app *bot_app) getExpenseReport() (string, error) {
 	prev, next, err := app.currentPaymentPeriod()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Can't get expense periods, %w", err)
 	}
 	query := `SELECT
        p.name,
@@ -113,7 +114,7 @@ func (app *bot_app) getExpenseReport() (string, error) {
     ORDER BY i.paymentdate`
 	rows, err := app.db.Query(query, time.Now().Month(), prev, next)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Can't get expense report data, %w", err)
 	}
 	var (
 		er         expenseReport
