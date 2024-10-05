@@ -12,6 +12,7 @@ build: build_delete
 	go build -o $(BUILD_PATH)/$(PACKAGE_NAME) $(PACKAGE_PATH)
 
 run:
+	docker compose up -d
 	go run $(PACKAGE_PATH)
 
 migrate_up:
