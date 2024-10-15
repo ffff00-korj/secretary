@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"log"
 
 	"github.com/ffff00-korj/secretary/internal/bot_app"
 )
 
 func main() {
+	ctx := context.Background()
 	app := bot_app.NewApp()
 	if err := app.Init(); err != nil {
 		log.Fatal(err)
@@ -16,13 +18,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	errorsChan := make(chan error)
-	go func() {
-		for {
-			go app.ProcessAnUpdate(<-upds, errorsChan)
-		}
-	}()
-	for err := range errorsChan {
-		log.Println(err)
+	for {
+		app.ProcessAnUpdateWithContext(ctx, <-upds)
 	}
 }

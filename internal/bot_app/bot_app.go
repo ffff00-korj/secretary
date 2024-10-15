@@ -1,6 +1,7 @@
 package bot_app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -132,7 +133,8 @@ func (app *bot_app) GetUpdates() (tg.UpdatesChannel, error) {
 	return updates, nil
 }
 
-func (app *bot_app) ProcessAnUpdate(upd tg.Update, errC chan<- error) {
+func (app *bot_app) ProcessAnUpdate(upd tg.Update) error {
+
 	switch upd.Message.Command() {
 	case config.CmdStart:
 		app.sendMessage(
@@ -150,8 +152,11 @@ func (app *bot_app) ProcessAnUpdate(upd tg.Update, errC chan<- error) {
 				upd.Message.Chat.ID,
 				"",
 			)
-			errC <- fmt.Errorf("Validation error: %w. args [%s]", err, upd.Message.CommandArguments())
-			return
+			return fmt.Errorf(
+				"Validation error: %w. args [%s]",
+				err,
+				upd.Message.CommandArguments(),
+			)
 		}
 		exists, err := app.checkProductExists(p)
 		if err != nil {
@@ -160,12 +165,11 @@ func (app *bot_app) ProcessAnUpdate(upd tg.Update, errC chan<- error) {
 				upd.Message.Chat.ID,
 				"",
 			)
-			errC <- err
-			return
+			return err
 		}
 		if exists {
 			app.sendMessage("Product with this name already exists.", upd.Message.Chat.ID, "")
-			return
+			return nil
 		}
 		if err := app.addProduct(p); err != nil {
 			app.sendMessage(
@@ -173,8 +177,7 @@ func (app *bot_app) ProcessAnUpdate(upd tg.Update, errC chan<- error) {
 				upd.Message.Chat.ID,
 				"",
 			)
-			errC <- err
-			return
+			return err
 		}
 		app.sendMessage(
 			fmt.Sprintf("Successfuly added new product:\n\n%s", p.String()),
@@ -189,8 +192,7 @@ func (app *bot_app) ProcessAnUpdate(upd tg.Update, errC chan<- error) {
 				upd.Message.Chat.ID,
 				"",
 			)
-			errC <- err
-			return
+			return err
 		}
 		app.sendMessage(utils.TextToMarkdown(report), upd.Message.Chat.ID, "markdown")
 	default:
@@ -199,6 +201,28 @@ func (app *bot_app) ProcessAnUpdate(upd tg.Update, errC chan<- error) {
 			upd.Message.Chat.ID,
 			"",
 		)
+	}
+
+	return nil
+}
+
+func (app *bot_app) ProcessAnUpdateWithContext(ctx context.Context, upds tg.Update) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	defer cancel()
+	errC := make(chan error)
+
+	go func() {
+		if err := app.ProcessAnUpdate(upds); err != nil {
+			errC <- err
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		log.Print(ctx.Err())
+	case <-errC:
+		log.Print(<-errC)
+    default:
 	}
 }
 

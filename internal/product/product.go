@@ -19,8 +19,11 @@ func (p *Product) String() string {
 
 func NewProductFromArgs(args string) (*Product, error) {
 	argl := strings.Split(args, " ")
-	if len(argl) != 3 {
+	if len(argl) < 3 {
 		return nil, errors.New("Not enough arguments!")
+	}
+	if len(argl) > 3 {
+		return nil, errors.New("Too much arguments!")
 	}
 	sum, err := strconv.Atoi(argl[1])
 	if err != nil {
