@@ -8,29 +8,29 @@ import (
 )
 
 type Product struct {
-	name       string
-	sum        int
-	paymentDay int
+	Name       string `db:"Name"`
+	Sum        int    `db:"Sum"`
+	PaymentDay int    `db:"PaymentDay"`
 }
 
 func NewProduct(name string, sum, day int) *Product {
-	return &Product{name: name, sum: sum, paymentDay: day}
+	return &Product{Name: name, Sum: sum, PaymentDay: day}
 }
 
 func (p *Product) String() string {
-	return fmt.Sprintf("Name: %s,\nSum: %d,\nPayment day: %d", p.name, p.sum, p.paymentDay)
+	return fmt.Sprintf("Name: %s,\nSum: %d,\nPayment day: %d", p.Name, p.Sum, p.PaymentDay)
 }
 
 func (p *Product) GetName() string {
-	return p.name
+	return p.Name
 }
 
 func (p *Product) GetSum() int {
-	return p.sum
+	return p.Sum
 }
 
 func (p *Product) GetPaymentDay() int {
-	return p.paymentDay
+	return p.PaymentDay
 }
 
 func NewProductFromArgs(args string) (*Product, error) {

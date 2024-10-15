@@ -1,7 +1,6 @@
 package bot_app
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	tgbotapi "github.com/Syfaro/telegram-bot-api"
+	"github.com/jmoiron/sqlx"
 	dotenv "github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
@@ -19,7 +19,7 @@ import (
 
 type bot_app struct {
 	bot *tgbotapi.BotAPI
-	db  *sql.DB
+	db  *sqlx.DB
 }
 
 type expenseReportRow struct {
@@ -52,7 +52,7 @@ func (app *bot_app) Init() (err error) {
 	if err != nil {
 		return
 	}
-	app.db, err = sql.Open(
+	app.db, err = sqlx.Connect(
 		config.DbDriverName,
 		fmt.Sprintf(
 			"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
@@ -66,9 +66,6 @@ func (app *bot_app) Init() (err error) {
 	if err != nil {
 		return err
 	}
-	if err = app.db.Ping(); err != nil {
-		return err
-	}
 	runPingDBTask(app.db, config.PingDuration, config.HeartBitDuration, config.HeartBitAttempts)
 	log.Print("Database connected")
 	log.Print("Application is initialized!")
@@ -76,7 +73,11 @@ func (app *bot_app) Init() (err error) {
 	return nil
 }
 
-func runPingDBTask(db *sql.DB, pingDuration, heartBitDuration time.Duration, heartBitAttempts int) {
+func runPingDBTask(
+	db *sqlx.DB,
+	pingDuration, heartBitDuration time.Duration,
+	heartBitAttempts int,
+) {
 	ticker := time.NewTicker(pingDuration * time.Second)
 	quit := make(chan struct{})
 	go func() {
@@ -167,7 +168,7 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update, errC chan<- error) {
 			app.sendMessage("Product with this name already exists.", upd.Message.Chat.ID, "")
 			return
 		}
-		if _, err := app.addProduct(p); err != nil {
+		if err := app.addProduct(p); err != nil {
 			app.sendMessage(
 				"Can't add product: Something went wrong on the server :(",
 				upd.Message.Chat.ID,

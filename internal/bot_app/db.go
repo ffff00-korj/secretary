@@ -26,16 +26,14 @@ func (app *bot_app) checkProductExists(p *product.Product) (bool, error) {
 	return true, nil
 }
 
-func (app *bot_app) addProduct(p *product.Product) (int, error) {
-	query := `INSERT INTO products(Name, Sum, PaymentDay)
-    VALUES($1, $2, $3) RETURNING id`
+func (app *bot_app) addProduct(p *product.Product) error {
+	query := `INSERT INTO products (Name, Sum, PaymentDay)
+    VALUES (:Name, :Sum, :PaymentDay)`
 
-	var id int
-	err := app.db.QueryRow(query, p.GetName(), p.GetSum(), p.GetPaymentDay()).Scan(&id)
-	if err != nil {
-		return 0, fmt.Errorf("Can't add product %w", err)
+	if _, err := app.db.NamedExec(query, *p); err != nil {
+		return fmt.Errorf("Can't add product %w", err)
 	}
-	return id, nil
+	return nil
 }
 
 func (app *bot_app) getExpensePeriod(day int) (int, int, bool, error) {
