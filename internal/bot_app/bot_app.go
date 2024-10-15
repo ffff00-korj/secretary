@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	tgbotapi "github.com/Syfaro/telegram-bot-api"
+	tg "github.com/Syfaro/telegram-bot-api"
 	"github.com/jmoiron/sqlx"
 	dotenv "github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -18,7 +18,7 @@ import (
 )
 
 type bot_app struct {
-	bot *tgbotapi.BotAPI
+	bot *tg.BotAPI
 	db  *sqlx.DB
 }
 
@@ -42,13 +42,13 @@ func (app *bot_app) Init() (err error) {
 	if err := dotenv.Load(); err != nil {
 		return errors.New(
 			fmt.Sprintf(
-				"Maybe %s file not found. Err message: %s",
+				"Maybe %s file not found: %s",
 				config.EnvFileName,
 				err.Error(),
 			),
 		)
 	}
-	app.bot, err = tgbotapi.NewBotAPI(os.Getenv(config.EnvTelegramToken))
+	app.bot, err = tg.NewBotAPI(os.Getenv(config.EnvTelegramToken))
 	if err != nil {
 		return
 	}
@@ -86,7 +86,6 @@ func runPingDBTask(
 			case <-ticker.C:
 				err := db.Ping()
 				if err == nil {
-					log.Println("DB is fine.")
 					continue
 				} else {
 					log.Printf("%s. Starting heart bits.", err)
@@ -122,8 +121,8 @@ func (app *bot_app) Close() {
 	log.Print("Application is closed!")
 }
 
-func (app *bot_app) GetUpdates() (tgbotapi.UpdatesChannel, error) {
-	upd := tgbotapi.NewUpdate(config.UpdateOffset)
+func (app *bot_app) GetUpdates() (tg.UpdatesChannel, error) {
+	upd := tg.NewUpdate(config.UpdateOffset)
 	upd.Timeout = config.Timeout
 
 	updates, err := app.bot.GetUpdatesChan(upd)
@@ -133,7 +132,7 @@ func (app *bot_app) GetUpdates() (tgbotapi.UpdatesChannel, error) {
 	return updates, nil
 }
 
-func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update, errC chan<- error) {
+func (app *bot_app) ProcessAnUpdate(upd tg.Update, errC chan<- error) {
 	switch upd.Message.Command() {
 	case config.CmdStart:
 		app.sendMessage(
@@ -204,7 +203,7 @@ func (app *bot_app) ProcessAnUpdate(upd tgbotapi.Update, errC chan<- error) {
 }
 
 func (app *bot_app) sendMessage(msg string, chatId int64, parser string) {
-	tg_msg := tgbotapi.NewMessage(chatId, msg)
+	tg_msg := tg.NewMessage(chatId, msg)
 	if parser != "" {
 		tg_msg.ParseMode = parser
 	}

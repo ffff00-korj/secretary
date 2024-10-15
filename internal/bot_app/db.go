@@ -16,7 +16,7 @@ func (app *bot_app) checkProductExists(p *product.Product) (bool, error) {
     WHERE p.name = $1
     LIMIT 1`
 	var exists bool
-	err := app.db.QueryRow(query, p.GetName()).Scan(&exists)
+	err := app.db.QueryRow(query, p.Name).Scan(&exists)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return false, nil
