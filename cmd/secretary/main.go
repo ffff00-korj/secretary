@@ -8,7 +8,9 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	app := bot_app.NewApp()
 	if err := app.Init(); err != nil {
 		log.Fatal(err)

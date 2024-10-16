@@ -133,7 +133,9 @@ func (app *bot_app) GetUpdates() (tg.UpdatesChannel, error) {
 	return updates, nil
 }
 
-func (app *bot_app) ProcessAnUpdate(upd tg.Update) error {
+func (app *bot_app) ProcessAnUpdate(ctx context.Context, upd tg.Update) error {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	switch upd.Message.Command() {
 	case config.CmdStart:
@@ -207,22 +209,22 @@ func (app *bot_app) ProcessAnUpdate(upd tg.Update) error {
 }
 
 func (app *bot_app) ProcessAnUpdateWithContext(ctx context.Context, upds tg.Update) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*30)
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	errC := make(chan error)
-
 	go func() {
-		if err := app.ProcessAnUpdate(upds); err != nil {
+		if err := app.ProcessAnUpdate(ctx, upds); err != nil {
 			errC <- err
 		}
 	}()
 
 	select {
 	case <-ctx.Done():
-		log.Print(ctx.Err())
-	case <-errC:
-		log.Print(<-errC)
-    default:
+        if ctx.Err() != nil {
+		    log.Print(ctx.Err())
+        }
+	case err := <-errC:
+		log.Print(err)
 	}
 }
 
